@@ -53,6 +53,9 @@
     (sendI (parse (second (s-exp->list s)))
            (s-exp->symbol (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
+   [(s-exp-match? '{instanceof ANY SYMBOL} s)
+    (instanceofI (parse (second (s-exp->list s)))
+                 (s-exp->symbol (third (s-exp->list s))))]
    [(s-exp-match? '{super SYMBOL ANY} s)
     (superI (s-exp->symbol (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
@@ -75,6 +78,10 @@
         (getI (numI 1) 'x))
   (test (parse '{send 1 m 2})
         (sendI (numI 1) 'm (numI 2)))
+  ;; Prompt 2
+  (test (parse '{instanceof 1 m})
+        (instanceofI (numI 1) 'm))
+  
   (test (parse '{super m 1})
         (superI 'm (numI 1)))
   (test/exn (parse `x)

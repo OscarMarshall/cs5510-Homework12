@@ -135,8 +135,12 @@
         [numI (n) (numT)]
         [plusI (l r) (typecheck-nums l r)]
         [multI (l r) (typecheck-nums l r)]
-        [argI () arg-type]
-        [thisI () this-type]
+        [argI () (if (equal? this-type (objT 'bad))
+                     (error 'typecheck "free variable")
+                     arg-type)]
+        [thisI () (if (equal? this-type (objT 'bad))
+                      (error 'typecheck "free variable")
+                      this-type)]
         [newI (class-name exprs)
               (local [(define arg-types (map recur exprs))
                       (define field-types
@@ -172,6 +176,10 @@
                                          t-classes)]
                    [else
                     (type-error obj-expr "object")]))]
+        [instanceofI (obj-expr class-name)
+                     (type-case Type (recur obj-expr)
+                       [objT (class-name) (numT)]
+                       [else (type-error obj-expr "object")])]
         [superI (method-name arg-expr)
                 (local [(define arg-type (recur arg-expr))
                         (define this-class
@@ -330,7 +338,18 @@
                                       (methodT 'm (numT) (numT)
                                                ;; No such method in superclass:
                                                (superI 'm (numI 0)))))))
-            "not found"))
+            "not found")
+  
+  ;; Prompt 1
+  (test/exn (typecheck (argI) empty)
+            "free variable")
+  (test/exn (typecheck (thisI) empty)
+            "free variable")
+  ;; Prompt 2
+  (test (typecheck-posn (instanceofI (newI 'posn (list (numI 0) (numI 1))) 'posn))
+        (numT))
+  (test/exn (typecheck (instanceofI (numI 0) 'object) empty)
+            "no type"))
 
 ;; ----------------------------------------
 

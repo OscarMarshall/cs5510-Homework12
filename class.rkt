@@ -18,10 +18,13 @@
   [ssendC (obj-expr : ExprC)
           (class-name : symbol)
           (method-name : symbol)
-          (arg-expr : ExprC)])
+          (arg-expr : ExprC)]
+  [instanceofC (obj-expr : ExprC)
+               (class-name : symbol)])
 
 (define-type ClassC
   [classC (name : symbol)
+          (super-name : symbol)
           (field-names : (listof symbol))
           (methods : (listof MethodC))])
 
@@ -67,14 +70,24 @@
               name
               (map2 kons field-names vals))))
 
+(define (subclassof [class-name : symbol]
+                    [target-name : symbol]
+                    [classes : (listof ClassC)]) : boolean
+  (cond
+    [(equal? class-name target-name) true]
+    [(equal? class-name 'object) false]
+    [else (subclassof (classC-super-name (find-class class-name classes))
+                      target-name
+                      classes)]))
+
 (module+ test
   (test/exn (find-class 'a empty)
             "not found")
-  (test (find-class 'a (list (classC 'a empty empty)))
-        (classC 'a empty empty))
-  (test (find-class 'b (list (classC 'a empty empty)
-                             (classC 'b empty empty)))
-        (classC 'b empty empty))
+  (test (find-class 'a (list (classC 'a 'object empty empty)))
+        (classC 'a 'object empty empty))
+  (test (find-class 'b (list (classC 'a 'object empty empty)
+                             (classC 'b 'object empty empty)))
+        (classC 'b 'object empty empty))
   (test (get-field 'a 
                    (list 'a 'b)
                    (list (numV 0) (numV 1)))
@@ -102,7 +115,7 @@
               (type-case Value (recur obj-expr)
                 [objV (class-name field-vals)
                       (type-case ClassC (find-class class-name classes)
-                        [classC (name field-names methods)
+                        [classC (name super-name field-names methods)
                                 (get-field field-name field-names 
                                            field-vals)])]
                 [else (error 'interp "not an object")])]
@@ -118,12 +131,26 @@
                 (local [(define obj (recur obj-expr))
                         (define arg-val (recur arg-expr))]
                   (call-method class-name method-name classes
-                               obj arg-val))]))))
+                               obj arg-val))]
+        [instanceofC (obj-expr target-name)
+                     (type-case Value (recur obj-expr)
+                       [objV (class-name field-vals)
+                             (begin (find-class target-name
+                                                (cons (classC 'object
+                                                              'object
+                                                              empty
+                                                              empty) classes))
+                                    (if (subclassof class-name
+                                                    target-name
+                                                    classes)
+                                        (numV 0)
+                                        (numV 1)))]
+                       [else (error 'interp "not an object")])]))))
 
 (define (call-method class-name method-name classes
                      obj arg-val)
   (type-case ClassC (find-class class-name classes)
-    [classC (name field-names methods)
+    [classC (name super-name field-names methods)
             (type-case MethodC (find-method method-name methods)
               [methodC (name body-expr)
                        (interp body-expr
@@ -150,6 +177,7 @@
   (define posn-class
     (classC 
      'posn
+     'object
      (list 'x 'y)
      (list (methodC 'mdist
                     (plusC (getC (thisC) 'x) (getC (thisC) 'y)))
@@ -164,6 +192,7 @@
   (define posn3D-class
     (classC 
      'posn3D
+     'posn
      (list 'x 'y 'z)
      (list (methodC 'mdist (plusC (getC (thisC) 'z)
                                   (ssendC (thisC) 'posn 'mdist (argC))))
@@ -204,6 +233,53 @@
 
   (test (interp-posn (sendC posn531 'addDist posn27))
         (numV 18))
+  
+  ;; Prompt 2
+  (test (interp-posn (instanceofC posn27 'posn))
+        (numV 0))
+  (test (interp-posn (instanceofC posn531 'posn))
+        (numV 0))
+  (test (interp-posn (instanceofC posn27 'posn3D))
+        (numV 1))
+  (test (interp-posn (instanceofC posn531 'object))
+        (numV 0))
+  (test (interp (instanceofC (newC 'test empty) 'test)
+                (list (classC 'test 'object empty empty))
+                (numV 0)
+                (numV 0))
+        (numV 0))
+  (test (interp (instanceofC (newC 'test empty) 'object)
+                (list (classC 'test 'object empty empty))
+                (numV 0)
+                (numV 0))
+        (numV 0))
+  (test (interp (instanceofC (newC 'test empty) 'bear)
+                (list (classC 'test 'object empty empty)
+                      (classC 'bear 'object empty empty))
+                (numV 0)
+                (numV 0))
+        (numV 1))
+  (test (interp (instanceofC (newC 'test2 empty) 'test)
+                (list (classC 'test 'object empty empty)
+                      (classC 'test2 'test empty empty))
+                (numV 0)
+                (numV 0))
+        (numV 0))
+  (test/exn (interp (instanceofC (numC 2) 'object)
+                    empty
+                    (numV 0)
+                    (numV 0))
+            "not an object")
+  (test/exn (interp (instanceofC (newC 'test empty) 'test2)
+                    (list (classC 'test 'object empty empty))
+                    (numV 0)
+                    (numV 0))
+            "find: not found")
+  (test/exn (interp (instanceofC (newC 'object empty) 'test)
+                    empty
+                    (numV 0)
+                    (numV 0))
+            "find: not found")
   
   (test/exn (interp-posn (plusC (numC 1) posn27))
             "not a number")
