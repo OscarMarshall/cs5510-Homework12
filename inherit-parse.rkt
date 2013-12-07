@@ -43,6 +43,10 @@
    [(s-exp-match? '{* ANY ANY} s)
     (multI (parse (second (s-exp->list s)))
            (parse (third (s-exp->list s))))]
+   [(s-exp-match? '{if0 ANY ANY ANY} s)
+    (if0I (parse (second (s-exp->list s)))
+          (parse (third (s-exp->list s)))
+          (parse (fourth (s-exp->list s))))]
    [(s-exp-match? '{new SYMBOL ANY ...} s)
     (newI (s-exp->symbol (second (s-exp->list s)))
           (map parse (rest (rest (s-exp->list s)))))]
@@ -78,9 +82,6 @@
         (getI (numI 1) 'x))
   (test (parse '{send 1 m 2})
         (sendI (numI 1) 'm (numI 2)))
-  ;; Prompt 2
-  (test (parse '{instanceof 1 m})
-        (instanceofI (numI 1) 'm))
   
   (test (parse '{super m 1})
         (superI 'm (numI 1)))
@@ -106,7 +107,15 @@
                 (list (methodI 'm1 (argI))
                       (methodI 'm2 (thisI)))))
   (test/exn (parse-class '{class})
-            "invalid input"))
+            "invalid input")
+  
+  ;; Prompt 2
+  (test (parse '{instanceof 1 m})
+        (instanceofI (numI 1) 'm))
+  
+  ;; Prompt 3
+  (test (parse '{if0 0 1 2})
+        (if0I (numI 0) (numI 1) (numI 2))))
 
 ;; ----------------------------------------
 

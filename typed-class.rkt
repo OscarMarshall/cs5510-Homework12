@@ -78,21 +78,12 @@
 
 ;; ----------------------------------------
 
-(define (is-subclass? name1 name2 t-classes)
-  (cond
-    [(equal? name1 name2) true]
-    [(equal? name1 'object) false]
-    [else
-     (type-case ClassT (find-classT name1 t-classes)
-       [classT (name super-name fields methods)
-               (is-subclass? super-name name2 t-classes)])]))
-
 (define (is-subtype? t1 t2 t-classes)
   (type-case Type t1
     [objT (name1)
           (type-case Type t2 
             [objT (name2)
-                  (is-subclass? name1 name2 t-classes)]
+                  (is-subclass? name1 name2 t-classes classT-super-name find-classT)]
             [else false])]
     [else (equal? t1 t2)]))
 
@@ -100,11 +91,11 @@
   (define a-t-class (classT 'a 'object empty empty))
   (define b-t-class (classT 'b 'a empty empty))
 
-  (test (is-subclass? 'object 'object empty)
+  (test (is-subclass? 'object 'object empty classT-super-name find-classT)
         true)
-  (test (is-subclass? 'a 'b (list a-t-class b-t-class))
+  (test (is-subclass? 'a 'b (list a-t-class b-t-class) classT-super-name find-classT)
         false)
-  (test (is-subclass? 'b 'a (list a-t-class b-t-class))
+  (test (is-subclass? 'b 'a (list a-t-class b-t-class) classT-super-name find-classT)
         true)
 
   (test (is-subtype? (numT) (numT) empty)
@@ -135,6 +126,17 @@
         [numI (n) (numT)]
         [plusI (l r) (typecheck-nums l r)]
         [multI (l r) (typecheck-nums l r)]
+        [if0I (tst thn els)
+              (type-case Type (recur tst)
+                [numT ()
+                      (local [(define thn-type (recur thn))
+                              (define els-type (recur els))]
+                        (if (is-subtype? els-type thn-type t-classes)
+                            thn-type
+                            (if (is-subtype? thn-type els-type t-classes)
+                                els-type
+                                (type-error els (to-string thn-type)))))]
+                [else (type-error tst "num")])]
         [argI () (if (equal? this-type (objT 'bad))
                      (error 'typecheck "free variable")
                      arg-type)]
@@ -346,9 +348,34 @@
   (test/exn (typecheck (thisI) empty)
             "free variable")
   ;; Prompt 2
-  (test (typecheck-posn (instanceofI (newI 'posn (list (numI 0) (numI 1))) 'posn))
+  (test (typecheck-posn (instanceofI (newI 'posn (list (numI 0) (numI 1)))
+                                     'posn))
         (numT))
   (test/exn (typecheck (instanceofI (numI 0) 'object) empty)
+            "no type")
+  
+  ;; Prompt 3
+  (test (typecheck (if0I (numI 0) (numI 1) (numI 2)) empty)
+        (numT))
+  (test (typecheck-posn (if0I (numI 1)
+                              (newI 'posn (list (numI 0) (numI 1)))
+                              (newI 'posn (list (numI 2) (numI 3)))))
+        (objT 'posn))
+  (test (typecheck-posn (if0I (numI 2)
+                              (newI 'posn (list (numI 0) (numI 1)))
+                              (newI 'posn3D (list (numI 0) (numI 1) (numI 2)))))
+        (objT 'posn))
+  (test (typecheck-posn (if0I (numI 3)
+                              (newI 'posn3D (list (numI 0) (numI 1) (numI 2)))
+                              (newI 'posn (list (numI 3) (numI 4)))))
+        (objT 'posn))
+  (test/exn (typecheck-posn (if0I (newI 'posn (list (numI 0) (numI 1)))
+                                  (numI 0)
+                                  (numI 1)))
+            "no type")
+  (test/exn (typecheck-posn (if0I (numI 0)
+                                  (numI 1)
+                                  (newI 'posn (list (numI 0) (numI 1)))))
             "no type"))
 
 ;; ----------------------------------------

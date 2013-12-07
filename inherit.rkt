@@ -11,6 +11,9 @@
          (rhs : ExprI)]
   [multI (lhs : ExprI)
          (rhs : ExprI)]
+  [if0I (tst : ExprI)
+        (thn : ExprI)
+        (els : ExprI)]
   [argI]
   [thisI]
   [newI (class-name : symbol)
@@ -47,6 +50,7 @@
       [numI (n) (numC n)]
       [plusI (l r) (plusC (recur l) (recur r))]
       [multI (l r) (multC (recur l) (recur r))]
+      [if0I (tst thn els) (if0C (recur tst) (recur thn) (recur els))]
       [argI () (argC)]
       [thisI () (thisC)]
       [newI (class-name field-exprs)
@@ -82,12 +86,16 @@
         (getC (numC 1) 'x))
   (test (expr-i->c (sendI (numI 1) 'mdist (numI 2)) 'object)
         (sendC (numC 1) 'mdist (numC 2)))
+  (test (expr-i->c (superI 'mdist (numI 2)) 'posn)
+        (ssendC (thisC) 'posn 'mdist (numC 2)))
+  
   ;; Prompt 2
   (test (expr-i->c (instanceofI (numI 0) 'object) 'object)
         (instanceofC (numC 0) 'object))
   
-  (test (expr-i->c (superI 'mdist (numI 2)) 'posn)
-        (ssendC (thisC) 'posn 'mdist (numC 2))))
+  ;; Prompt 3
+  (test (expr-i->c (if0I (numI 0) (numI 1) (numI 2)) 'object)
+        (if0C (numC 0) (numC 1) (numC 2))))
 
 ;; ----------------------------------------
 

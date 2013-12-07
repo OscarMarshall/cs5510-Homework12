@@ -6,6 +6,9 @@
          (rhs : ExprC)]
   [multC (lhs : ExprC)
          (rhs : ExprC)]
+  [if0C (tst : ExprC)
+        (thn : ExprC)
+        (els : ExprC)]
   [argC]
   [thisC]
   [newC (class-name : symbol)
@@ -70,15 +73,19 @@
               name
               (map2 kons field-names vals))))
 
-(define (subclassof [class-name : symbol]
-                    [target-name : symbol]
-                    [classes : (listof ClassC)]) : boolean
+(define (is-subclass? [name1 : symbol]
+                      [name2 : symbol]
+                      [classes : (listof 'a)]
+                      [class-super-name : ('a -> symbol)]
+                      [find-class : (symbol (listof 'a) -> 'a)]) : boolean
   (cond
-    [(equal? class-name target-name) true]
-    [(equal? class-name 'object) false]
-    [else (subclassof (classC-super-name (find-class class-name classes))
-                      target-name
-                      classes)]))
+    [(equal? name1 name2) true]
+    [(equal? name1 'object) false]
+    [else (is-subclass? (class-super-name (find-class name1 classes))
+                        name2
+                        classes
+                        class-super-name
+                        find-class)]))
 
 (module+ test
   (test/exn (find-class 'a empty)
@@ -103,6 +110,8 @@
         [numC (n) (numV n)]
         [plusC (l r) (num+ (recur l) (recur r))]
         [multC (l r) (num* (recur l) (recur r))]
+        [if0C (tst thn els)
+              (if (zero? (numV-n (recur tst))) (recur thn) (recur els))]
         [thisC () this-val]
         [argC () arg-val]
         [newC (class-name field-exprs)
@@ -140,9 +149,11 @@
                                                               'object
                                                               empty
                                                               empty) classes))
-                                    (if (subclassof class-name
-                                                    target-name
-                                                    classes)
+                                    (if (is-subclass? class-name
+                                                      target-name
+                                                      classes
+                                                      classC-super-name
+                                                      find-class)
                                         (numV 0)
                                         (numV 1)))]
                        [else (error 'interp "not an object")])]))))
@@ -234,7 +245,18 @@
   (test (interp-posn (sendC posn531 'addDist posn27))
         (numV 18))
   
-  ;; Prompt 2
+  (test/exn (interp-posn (plusC (numC 1) posn27))
+            "not a number")
+  (test/exn (interp-posn (getC (numC 1) 'x))
+            "not an object")
+  (test/exn (interp-posn (sendC (numC 1) 'mdist (numC 0)))
+            "not an object")
+  (test/exn (interp-posn (ssendC (numC 1) 'posn 'mdist (numC 0)))
+            "not an object")
+  (test/exn (interp-posn (newC 'posn (list (numC 0))))
+            "wrong field count")
+  
+    ;; Prompt 2
   (test (interp-posn (instanceofC posn27 'posn))
         (numV 0))
   (test (interp-posn (instanceofC posn531 'posn))
@@ -281,13 +303,8 @@
                     (numV 0))
             "find: not found")
   
-  (test/exn (interp-posn (plusC (numC 1) posn27))
-            "not a number")
-  (test/exn (interp-posn (getC (numC 1) 'x))
-            "not an object")
-  (test/exn (interp-posn (sendC (numC 1) 'mdist (numC 0)))
-            "not an object")
-  (test/exn (interp-posn (ssendC (numC 1) 'posn 'mdist (numC 0)))
-            "not an object")
-  (test/exn (interp-posn (newC 'posn (list (numC 0))))
-            "wrong field count"))
+  ;; Prompt 3
+  (test (interp (if0C (numC 0) (numC 1) (numC 2)) empty (numV 0) (numV 0))
+        (numV 1))
+  (test (interp (if0C (numC 1) (numC 1) (numC 2)) empty (numV 0) (numV 0))
+        (numV 2)))
