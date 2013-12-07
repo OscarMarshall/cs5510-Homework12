@@ -83,7 +83,11 @@
     [objT (name1)
           (type-case Type t2 
             [objT (name2)
-                  (is-subclass? name1 name2 t-classes classT-super-name find-classT)]
+                  (is-subclass? name1
+                                name2
+                                t-classes
+                                classT-super-name
+                                find-classT)]
             [else false])]
     [else (equal? t1 t2)]))
 
@@ -111,6 +115,52 @@
 
 ;; ----------------------------------------
 
+(define (least-upper-bound-class [name1 : symbol]
+                                 [name2 : symbol]
+                                 [t-classes : (listof ClassT)]) : symbol
+  (cond
+    [(is-subclass? name1 name2 t-classes classT-super-name find-classT) name2]
+    [else
+     (least-upper-bound-class name1
+                              (classT-super-name
+                               (find-classT name2 t-classes))
+                              t-classes)]))
+
+(define (least-upper-bound-type [t1 : Type]
+                                [t2 : Type]
+                                [t-classes : (listof ClassT)]) : Type
+  (type-case Type t1
+    [objT (name1)
+          (type-case Type t2
+            [objT (name2)
+                  (objT (least-upper-bound-class name1 name2 t-classes))]
+            [else (type-error t2 "object")])]
+    [else (if (equal? t1 t2) t1 (type-error t2 (to-string t1)))]))
+
+(module+ test
+  (define c-t-class (classT 'c 'a empty empty))
+  (define d-t-class (classT 'd 'object empty empty))
+  (test (least-upper-bound-class 'a 'd (list a-t-class d-t-class))
+        'object)
+  (test (least-upper-bound-type (numT) (numT) empty)
+        (numT))
+  (test (least-upper-bound-type (objT 'a) (objT 'a) (list a-t-class))
+        (objT 'a))
+  (test (least-upper-bound-type (objT 'a) (objT 'b) (list a-t-class b-t-class))
+        (objT 'a))
+  (test (least-upper-bound-type (objT 'b) (objT 'a) (list a-t-class b-t-class))
+        (objT 'a))
+  (test (least-upper-bound-type (objT 'b)
+                                (objT 'c)
+                                (list a-t-class b-t-class c-t-class))
+        (objT 'a))
+  (test/exn (least-upper-bound-type (numT) (objT 'a) (list a-t-class))
+            "no type")
+  (test/exn (least-upper-bound-type (objT 'a) (numT) (list a-t-class))
+            "no type"))
+
+;; ----------------------------------------
+
 (define typecheck-expr : (ExprI (listof ClassT) Type Type -> Type)
   (lambda (expr t-classes arg-type this-type)
     (local [(define (recur expr)
@@ -129,13 +179,9 @@
         [if0I (tst thn els)
               (type-case Type (recur tst)
                 [numT ()
-                      (local [(define thn-type (recur thn))
-                              (define els-type (recur els))]
-                        (if (is-subtype? els-type thn-type t-classes)
-                            thn-type
-                            (if (is-subtype? thn-type els-type t-classes)
-                                els-type
-                                (type-error els (to-string thn-type)))))]
+                      (least-upper-bound-type (recur thn)
+                                              (recur els)
+                                              t-classes)]
                 [else (type-error tst "num")])]
         [argI () (if (equal? this-type (objT 'bad))
                      (error 'typecheck "free variable")
@@ -376,7 +422,18 @@
   (test/exn (typecheck-posn (if0I (numI 0)
                                   (numI 1)
                                   (newI 'posn (list (numI 0) (numI 1)))))
-            "no type"))
+            "no type")
+  
+  ;; Prompt 4
+  (test (typecheck (if0I (numI 0) (newI 'b empty) (newI 'c empty))
+                   (list (classT 'a 'object empty empty)
+                         (classT 'b 'a empty empty)
+                         (classT 'c 'a empty empty)))
+        (objT 'a))
+  (test (typecheck (if0I (numI 0) (newI 'a empty) (newI 'b empty))
+                   (list (classT 'a 'object empty empty)
+                         (classT 'b 'object empty empty)))
+        (objT 'object)))
 
 ;; ----------------------------------------
 
