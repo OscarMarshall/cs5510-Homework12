@@ -21,7 +21,8 @@
 
 (define-type Type
   [numT]
-  [objT (class-name : symbol)])
+  [objT (class-name : symbol)]
+  [badT])
 
 (module+ test
   (print-only-errors true))
@@ -183,10 +184,10 @@
                                               (recur els)
                                               t-classes)]
                 [else (type-error tst "num")])]
-        [argI () (if (equal? this-type (objT 'bad))
+        [argI () (if (equal? arg-type (badT))
                      (error 'typecheck "free variable")
                      arg-type)]
-        [thisI () (if (equal? this-type (objT 'bad))
+        [thisI () (if (equal? this-type (badT))
                       (error 'typecheck "free variable")
                       this-type)]
         [newI (class-name exprs)
@@ -301,7 +302,7 @@
     (map (lambda (t-class)
            (typecheck-class t-class t-classes))
          t-classes)
-    (typecheck-expr a t-classes (numT) (objT 'bad))))
+    (typecheck-expr a t-classes (badT) (badT))))
 
 ;; ----------------------------------------
 
