@@ -98,9 +98,17 @@
 
   (test (is-subclass? 'object 'object empty classT-super-name find-classT)
         true)
-  (test (is-subclass? 'a 'b (list a-t-class b-t-class) classT-super-name find-classT)
+  (test (is-subclass? 'a
+                      'b
+                      (list a-t-class b-t-class)
+                      classT-super-name
+                      find-classT)
         false)
-  (test (is-subclass? 'b 'a (list a-t-class b-t-class) classT-super-name find-classT)
+  (test (is-subclass? 'b
+                      'a
+                      (list a-t-class b-t-class)
+                      classT-super-name
+                      find-classT)
         true)
 
   (test (is-subtype? (numT) (numT) empty)
@@ -215,6 +223,19 @@
                         (type-case FieldT field
                           [fieldT (name type) type]))]
                 [else (type-error obj-expr "object")])]
+        [setI (obj-expr field-name arg-expr)
+              (local [(define obj-type (recur obj-expr))]
+                (type-case Type obj-type
+                  [objT (class-name)
+                        (type-case FieldT (find-field-in-tree
+                                           field-name
+                                           (find-classT class-name t-classes)
+                                           t-classes)
+                          [fieldT (name type)
+                                  (if (equal? type (recur arg-expr))
+                                      obj-type
+                                      (type-error arg-expr (to-string type)))])]
+                  [else (type-error obj-expr "object")]))]
         [sendI (obj-expr method-name arg-expr)
                (local [(define obj-type (recur obj-expr))
                        (define arg-type (recur arg-expr))]
@@ -344,9 +365,12 @@
   (test (typecheck-posn (sendI posn27 'addDist posn531))
         (numT))
 
-  (test (typecheck-posn (newI 'square (list (newI 'posn (list (numI 0) (numI 1))))))
+  (test (typecheck-posn (newI 'square
+                              (list (newI 'posn (list (numI 0) (numI 1))))))
         (objT 'square))
-  (test (typecheck-posn (newI 'square (list (newI 'posn3D (list (numI 0) (numI 1) (numI 3))))))
+  (test (typecheck-posn (newI 'square
+                              (list (newI 'posn3D
+                                          (list (numI 0) (numI 1) (numI 3))))))
         (objT 'square))
   
   (test (typecheck (multI (numI 1) (numI 2))
@@ -377,7 +401,9 @@
                                                     (objT 'object) (numT)
                                                     (numI 10))))))
             "bad override")
-  (test/exn (typecheck-method (methodT 'm (numT) (objT 'object) (numI 0)) (objT 'object) empty)
+  (test/exn (typecheck-method (methodT 'm (numT) (objT 'object) (numI 0))
+                              (objT 'object)
+                              empty)
             "no type")
   (test/exn (typecheck (numI 0)
                        (list square-t-class
@@ -434,7 +460,23 @@
   (test (typecheck (if0I (numI 0) (newI 'a empty) (newI 'b empty))
                    (list (classT 'a 'object empty empty)
                          (classT 'b 'object empty empty)))
-        (objT 'object)))
+        (objT 'object))
+  
+  ;; Prompt 6
+  (test (typecheck-posn (setI (newI 'posn (list (numI 1) (numI 2)))
+                              'x
+                              (numI 3)))
+        (objT 'posn))
+  (test/exn (typecheck-posn (setI (newI 'posn (list (numI 1) (numI 2)))
+                                  'z
+                                  (numI 3)))
+            "find: not found")
+  (test/exn (typecheck-posn (setI (numI 0) 'x (numI 1)))
+            "no type")
+  (test/exn (typecheck-posn (setI (newI 'posn (list (numI 1) (numI 2)))
+                                  'x
+                                  (newI 'posn (list (numI 1) (numI 2)))))
+            "no type"))
 
 ;; ----------------------------------------
 

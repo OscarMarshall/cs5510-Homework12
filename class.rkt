@@ -15,6 +15,9 @@
         (args : (listof ExprC))]
   [getC (obj-expr : ExprC)
         (field-name : symbol)]
+  [setC (obj-expr : ExprC)
+        (field-name : symbol)
+        (arg-expr : ExprC)]
   [sendC (obj-expr : ExprC)
          (method-name : symbol)
          (arg-expr : ExprC)]
@@ -38,7 +41,7 @@
 (define-type Value
   [numV (n : number)]
   [objV (class-name : symbol)
-        (field-values : (listof Value))])
+        (field-values : (listof (boxof Value)))])
 
 (module+ test
   (print-only-errors true))
@@ -66,12 +69,21 @@
 
 (define (get-field [name : symbol] 
                    [field-names : (listof symbol)] 
-                   [vals : (listof Value)])
+                   [vals : (listof (boxof Value))]) : Value
   ;; Pair fields and values, find by field name,
   ;; then extract value from pair
-  (kons-rest ((make-find kons-first)
-              name
-              (map2 kons field-names vals))))
+  (unbox (kons-rest ((make-find kons-first)
+                     name
+                     (map2 kons field-names vals)))))
+
+(define (set-field [name : symbol]
+                   [new-val : Value]
+                   [field-names : (listof symbol)]
+                   [vals : (listof (boxof Value))])
+  (set-box! (kons-rest ((make-find kons-first)
+                        name
+                        (map2 kons field-names vals)))
+            new-val))
 
 (define (is-subclass? [name1 : symbol]
                       [name2 : symbol]
@@ -97,7 +109,7 @@
         (classC 'b 'object empty empty))
   (test (get-field 'a 
                    (list 'a 'b)
-                   (list (numV 0) (numV 1)))
+                   (list (box (numV 0)) (box (numV 1))))
         (numV 0)))
 
 ;; ----------------------------------------
@@ -116,7 +128,7 @@
         [argC () arg-val]
         [newC (class-name field-exprs)
               (local [(define c (find-class class-name classes))
-                      (define vals (map recur field-exprs))]
+                      (define vals (map box (map recur field-exprs)))]
                 (if (= (length vals) (length (classC-field-names c)))
                     (objV class-name vals)
                     (error 'interp "wrong field count")))]
@@ -125,9 +137,22 @@
                 [objV (class-name field-vals)
                       (type-case ClassC (find-class class-name classes)
                         [classC (name super-name field-names methods)
-                                (get-field field-name field-names 
+                                (get-field field-name
+                                           field-names
                                            field-vals)])]
                 [else (error 'interp "not an object")])]
+        [setC (obj-expr field-name arg-expr)
+              (local [(define obj-v (recur obj-expr))]
+                (type-case Value obj-v
+                  [objV (class-name field-vals)
+                        (type-case ClassC (find-class class-name classes)
+                          [classC (name super-name field-names methods)
+                                  (begin (set-field field-name
+                                                    (recur arg-expr)
+                                                    field-names
+                                                    field-vals)
+                                         obj-v)])]
+                [else (error 'interp "not an object")]))]
         [sendC (obj-expr method-name arg-expr)
                (local [(define obj (recur obj-expr))
                        (define arg-val (recur arg-expr))]
@@ -229,7 +254,7 @@
         (numV 70))
 
   (test (interp-posn (newC 'posn (list (numC 2) (numC 7))))
-        (objV 'posn (list (numV 2) (numV 7))))
+        (objV 'posn (list (box (numV 2)) (box (numV 7)))))
 
   (test (interp-posn (sendC posn27 'mdist (numC 0)))
         (numV 9))
@@ -307,4 +332,10 @@
   (test (interp (if0C (numC 0) (numC 1) (numC 2)) empty (numV 0) (numV 0))
         (numV 1))
   (test (interp (if0C (numC 1) (numC 1) (numC 2)) empty (numV 0) (numV 0))
-        (numV 2)))
+        (numV 2))
+  
+  ;; Prompt 6
+  (test (interp-posn (setC (newC 'posn (list (numC 1) (numC 2))) 'x (numC 3)))
+        (objV 'posn (list (box (numV 3)) (box (numV 2)))))
+  (test/exn (interp-posn (setC (numC 1) 'x (numC 4)))
+            "not an object"))

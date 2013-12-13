@@ -53,6 +53,10 @@
    [(s-exp-match? '{get ANY SYMBOL} s)
     (getI (parse (second (s-exp->list s)))
           (s-exp->symbol (third (s-exp->list s))))]
+   [(s-exp-match? '{set ANY SYMBOL ANY} s)
+    (setI (parse (second (s-exp->list s)))
+          (s-exp->symbol (third (s-exp->list s)))
+          (parse (fourth (s-exp->list s))))]
    [(s-exp-match? '{send ANY SYMBOL ANY} s)
     (sendI (parse (second (s-exp->list s)))
            (s-exp->symbol (third (s-exp->list s)))
@@ -115,7 +119,11 @@
   
   ;; Prompt 3
   (test (parse '{if0 0 1 2})
-        (if0I (numI 0) (numI 1) (numI 2))))
+        (if0I (numI 0) (numI 1) (numI 2)))
+  
+  ;; Prompt 6
+  (test (parse '{set 0 x 1})
+        (setI (numI 0) 'x (numI 1))))
 
 ;; ----------------------------------------
 
