@@ -28,6 +28,8 @@
          (arg-expr : ExprI)]
   [instanceofI (obj-expr : ExprI)
                (class-name : symbol)]
+  [castI (class-name : symbol)
+         (obj-expr : ExprI)]
   [superI (method-name : symbol)
           (arg-expr : ExprI)])
 
@@ -68,6 +70,7 @@
                     (recur arg-expr))]
       [instanceofI (obj-expr class-name)
                    (instanceofC (recur obj-expr) class-name)]
+      [castI (class-name obj-expr) (castC class-name (recur obj-expr))]
       [superI (method-name arg-expr)
               (ssendC (thisC)
                       super-name
@@ -101,6 +104,10 @@
   ;; Prompt 3
   (test (expr-i->c (if0I (numI 0) (numI 1) (numI 2)) 'object)
         (if0C (numC 0) (numC 1) (numC 2)))
+  
+  ;; Promtp 5
+  (test (expr-i->c (castI 'posn (numI 0)) 'object)
+        (castC 'posn (numC 0)))
   
   ;; Prompt 6
   (test (expr-i->c (setI (numI 0) 'x (numI 1)) 'object)

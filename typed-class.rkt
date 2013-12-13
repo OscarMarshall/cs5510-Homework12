@@ -250,6 +250,22 @@
                      (type-case Type (recur obj-expr)
                        [objT (class-name) (numT)]
                        [else (type-error obj-expr "object")])]
+        [castI (target-name obj-expr)
+               (type-case Type (recur obj-expr)
+                 [objT (class-name)
+                       (if (or (is-subclass? target-name
+                                             class-name
+                                             t-classes
+                                             classT-super-name
+                                             find-classT)
+                               (is-subclass? class-name
+                                             target-name
+                                             t-classes
+                                             classT-super-name
+                                             find-classT))
+                            (objT target-name)
+                            (type-error obj-expr (symbol->string target-name)))]
+                 [else (type-error obj-expr "object")])]
         [superI (method-name arg-expr)
                 (local [(define arg-type (recur arg-expr))
                         (define this-class
@@ -461,6 +477,22 @@
                    (list (classT 'a 'object empty empty)
                          (classT 'b 'object empty empty)))
         (objT 'object))
+  
+  ;; Prompt 5
+  (test (typecheck-posn (castI 'posn3D (newI 'posn (list (numI 9) (numI 4)))))
+        (objT 'posn3D))
+  (test (typecheck-posn (castI 'posn (newI 'posn3D
+                                           (list (numI 4) (numI 5) (numI 3)))))
+        (objT 'posn))
+  (test (typecheck-posn (castI 'posn (newI 'posn (list (numI 3) (numI 2)))))
+        (objT 'posn))
+  (test/exn (typecheck (castI 'b (newI 'c empty))
+                       (list (classT 'a 'object empty empty)
+                             (classT 'b 'a empty empty)
+                             (classT 'c 'a empty empty)))
+            "no type")
+  (test/exn (typecheck-posn (castI 'posn (numI 4)))
+            "no type")
   
   ;; Prompt 6
   (test (typecheck-posn (setI (newI 'posn (list (numI 1) (numI 2)))

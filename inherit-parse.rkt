@@ -64,6 +64,9 @@
    [(s-exp-match? '{instanceof ANY SYMBOL} s)
     (instanceofI (parse (second (s-exp->list s)))
                  (s-exp->symbol (third (s-exp->list s))))]
+   [(s-exp-match? '{cast SYMBOL ANY} s)
+    (castI (s-exp->symbol (second (s-exp->list s)))
+           (parse (third (s-exp->list s))))]
    [(s-exp-match? '{super SYMBOL ANY} s)
     (superI (s-exp->symbol (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
@@ -120,6 +123,10 @@
   ;; Prompt 3
   (test (parse '{if0 0 1 2})
         (if0I (numI 0) (numI 1) (numI 2)))
+  
+  ;; Prompt 5
+  (test (parse '{cast posn 3})
+        (castI 'posn (numI 3)))
   
   ;; Prompt 6
   (test (parse '{set 0 x 1})
