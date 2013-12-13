@@ -26,7 +26,9 @@
           (method-name : symbol)
           (arg-expr : ExprC)]
   [instanceofC (obj-expr : ExprC)
-               (class-name : symbol)])
+               (class-name : symbol)]
+  [castC (class-name : symbol)
+         (obj-expr : ExprC)])
 
 (define-type ClassC
   [classC (name : symbol)
@@ -99,6 +101,21 @@
                         class-super-name
                         find-class)]))
 
+(define (instanceof [obj : Value] [target-name : symbol] [classes : (listof ClassC)]) : boolean
+  (type-case Value obj
+    [objV (class-name field-vals)
+          (begin (find-class target-name
+                             (cons (classC 'object
+                                           'object
+                                           empty
+                                           empty) classes))
+                 (is-subclass? class-name
+                               target-name
+                               classes
+                               classC-super-name
+                               find-class))]
+    [else (error 'interp "not an object")]))
+
 (module+ test
   (test/exn (find-class 'a empty)
             "not found")
@@ -167,21 +184,14 @@
                   (call-method class-name method-name classes
                                obj arg-val))]
         [instanceofC (obj-expr target-name)
-                     (type-case Value (recur obj-expr)
-                       [objV (class-name field-vals)
-                             (begin (find-class target-name
-                                                (cons (classC 'object
-                                                              'object
-                                                              empty
-                                                              empty) classes))
-                                    (if (is-subclass? class-name
-                                                      target-name
-                                                      classes
-                                                      classC-super-name
-                                                      find-class)
-                                        (numV 0)
-                                        (numV 1)))]
-                       [else (error 'interp "not an object")])]))))
+                     (if (instanceof (recur obj-expr) target-name classes)
+                         (numV 0)
+                         (numV 1))]
+        [castC (target-name obj-expr)
+               (local [(define obj-value (recur obj-expr))]
+                 (if (instanceof obj-value target-name classes)
+                     obj-value
+                     (error 'interp (string-append "object type not " (symbol->string target-name)))))]))))
 
 (define (call-method class-name method-name classes
                      obj arg-val)
@@ -333,6 +343,14 @@
         (numV 1))
   (test (interp (if0C (numC 1) (numC 1) (numC 2)) empty (numV 0) (numV 0))
         (numV 2))
+
+  ;; Prompt 5
+  (test (interp-posn (castC 'posn (newC 'posn (list (numC 0) (numC 1)))))
+        (objV 'posn (list (box (numV 0)) (box (numV 1)))))
+  (test (interp-posn (castC 'posn (newC 'posn3D (list (numC 1) (numC 2) (numC 3)))))
+        (objV 'posn3D (list (box (numV 1)) (box (numV 2)) (box (numV 3)))))
+  (test/exn (interp-posn (castC 'posn3D (newC 'posn (list (numC 5) (numC 7)))))
+            "object type not posn3D")
   
   ;; Prompt 6
   (test (interp-posn (setC (newC 'posn (list (numC 1) (numC 2))) 'x (numC 3)))
